@@ -1,7 +1,7 @@
 #! /bin/sh
 
 clear
-echo "\033[5;0H\033[32m\033[0m"
+echo "\033[5;0H"
 echo "\033[32m******************************************************************\033[0m"
 echo "\033[32m**********  *    *  *****  *    *  *****       *******************\033[0m"
 echo "\033[32m***********  *  *  *******  *  *  ******  (*)   ******************\033[0m"
@@ -11,36 +11,29 @@ echo "\033[32m**************  *************  *********  ************************
 echo "\033[32m**************  *************  *********  ************************\033[0m"
 echo "\033[32m******************************************************************\033[0m"
 
-echo "\033[15;0H\033[32m------------------------------------------------------------------\033[0m"
-echo "\033[16;3H\033[32m1.---->下载代码\033[0m"
-echo "\033[17;3H\033[32m2.---->配置环境\033[0m"
-echo "\033[18;3H\033[32m3.---->启动服务\033[0m"
-echo "\033[32m------------------------------------------------------------------\033[0m"
+echo "\033[15;0H\033[32m------------------------------------------------------------------"
+echo "\033[16;3H1.---->下载代码"
+echo "\033[17;3H2.---->配置环境"
+echo "\033[18;3H3.---->启动服务"
+echo "------------------------------------------------------------------\033[0m"
 
-echo "\033[21;0H\033[32m\033[0m"
-
-# ip 当参数传进来
-if [ -z "$1" ]; then
-    echo "请输入IP"
-    exit
-fi
+echo "\033[21;0H"
 
 read -p "please input select number : " num
 
 case $num in
     1)
-        echo "下载代码"
+        echo "下载代码..."
         # 使用git下载代码需要一个服务器一个服务器的去下载 把所有需要用的服务都下载下来
         # git clone ssh://git@git.norn7.com:WeiGame/c-redis-sentinel.git
-        # echo "下载完成"
         # 使用scp 命令可以将所有要用到的代码放在一个目录中直接下载
-        # sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data /
-        # sudo mv /data/18 /opt
-        sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/home/wcb_tech01/get-docker.sh /
-        sudo mv /get-docker.sh /home/yangyp
+        sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data /
+        sudo mv /data/18 /opt
+        echo "下载完成!"
     ;;
     2)
         echo "配置环境"
+        read -p "please input local ip : " localIp
         #根据当前系统(Ubuntu、CentOS)安装docker
         result=`sudo find /etc/ -name redhat-release`
         # echo $result
@@ -51,6 +44,7 @@ case $num in
             sudo apt-get remove docker \
                          docker-engine \
                          docker.io
+
             # 2 鉴于国内网络问题 这里换成阿里源
             sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
             sudo cp /data/workspace/redis-sentinel/sources.list /etc/apt/sources.list
@@ -77,35 +71,99 @@ case $num in
             udo groupadd docker
             sudo usermod -aG docker $USER
             # 安装完成
-
-            # 配置ubuntu服务
-            /data/workspace/ubuntu-dev/./build
-            # 配置redis服务
-            /data/workspace/redis-sentinel/./build
-            # 配置name服务
-            /data/workspace/name-service/./build
-            # 获取旧的IP
-            temp=`cat /data/workspace/name-service/supervisor-app.conf`
-            oldIp=${temp##*=}
-            oldIp=${oldIp%% *}
-            # 修改IP
-            sed -i "s/$oldIp/$1/g" /data/workspace/name-service/supervisor-app.conf
-
         else
             echo "当前系统是CentOS"
             # 安装docker
+            # 1 卸载旧版本
+            sudo yum remove docker \
+                            docker-client \
+                            docker-client-latest \
+                            docker-common \
+                            docker-latest \
+                            docker-latest-logrotate \
+                            docker-logrotate \
+                            docker-selinux \
+                            docker-engine-selinux \
+                            docker-engine
+
+            # 2 安装依赖包
+            sudo yum install -y yum-utils \
+                     device-mapper-persistent-data \
+                     lvm2
+
+            # 3 使用国内源
+            udo yum-config-manager \
+                --add-repo \
+                https://mirrors.ustc.edu.cn/docker-ce/linux/centos/docker-ce.repo
+
+            # 4 安装 Docker CE
+            sudo yum makecache fast
+            sudo yum install docker-ce
+            curl -fsSL get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh --mirror Aliyun
+
+            # 5 启动 Docker CE
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            # 6 建立 docker 用户组
+            sudo groupadd docker
+            sudo usermod -aG docker $USER
+            # 安装完成
         fi
+        # 配置ubuntu服务
+        cd /data/workspace/ubuntu-dev/
+        ./build
+        # 配置redis服务
+        cd /data/workspace/redis-sentinel/
+        ./build
+        # 配置name服务
+        cd /data/workspace/name-service/
+        ./build
+        # 获取旧的IP
+        temp=`cat /data/workspace/name-service/supervisor-app.conf`
+        oldIp=${temp##*=}
+        oldIp=${oldIp%% *}
+        # 修改IP
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/name-service/supervisor-app.conf
+
+        # 改其他服的IP
+        # Node-Manager
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/Node-Manager/lib/mw-node
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/Node-Manager/lib/nm-mw.json
+        # api-server
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/api-server/lib/my-api
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/api-server/lib/my-api.json
+        # game-server
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/game-server/lib/mw-game
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/game-server/lib/mw-game.json
+        # pk-server
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/pk-server/lib/mw-pk
+        sed -i "s/$oldIp/$localIp/g" /data/workspace/pk-server/lib/mw_pk.json
     ;;
     3)
         echo "启动服务"
-        v=`cat /home/yangyp/test.txt`
-        # echo $v
-        # 获取旧的IP
-        # oldIp=${v##*=}
-        oldIp=${${v##*=}%% *}
-        # echo $oldIp
-        # 修改IP
-        sed -i "s/$oldIp/$1/g" /home/yangyp/test.txt
+        # 启动name服务
+        # cd /data/workspace/name-service/
+        # ./start
+
+        echo "请手动开启服务："
+        sleep 1
+        echo "1. 启动redis服"
+        sleep 1
+        echo "2. 启动Node服"
+        sleep 1
+        echo "3. 启动api服"
+        sleep 1
+        echo "4. 启动pk服"
+        sleep 1
+        echo "5. 启动game服"
+        sleep 1
+        echo "^_^"
+
+        # 启动redis服务
+        # cd /data/workspace/redis-sentinel/
+        # ./start
         
     ;;
     *)
