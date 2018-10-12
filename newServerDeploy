@@ -1,0 +1,115 @@
+#! /bin/sh
+
+clear
+echo "\033[5;0H\033[32m\033[0m"
+echo "\033[32m******************************************************************\033[0m"
+echo "\033[32m**********  *    *  *****  *    *  *****       *******************\033[0m"
+echo "\033[32m***********  *  *  *******  *  *  ******  (*)   ******************\033[0m"
+echo "\033[32m************  **  *********  **  *******       *******************\033[0m"
+echo "\033[32m**************  *************  *********  ************************\033[0m"
+echo "\033[32m**************  *************  *********  ************************\033[0m"
+echo "\033[32m**************  *************  *********  ************************\033[0m"
+echo "\033[32m******************************************************************\033[0m"
+
+echo "\033[15;0H\033[32m------------------------------------------------------------------\033[0m"
+echo "\033[16;3H\033[32m1.---->下载代码\033[0m"
+echo "\033[17;3H\033[32m2.---->配置环境\033[0m"
+echo "\033[18;3H\033[32m3.---->启动服务\033[0m"
+echo "\033[32m------------------------------------------------------------------\033[0m"
+
+echo "\033[21;0H\033[32m\033[0m"
+
+# ip 当参数传进来
+if [ -z "$1" ]; then
+    echo "请输入IP"
+    exit
+fi
+
+read -p "please input select number : " num
+
+case $num in
+    1)
+        echo "下载代码"
+        # 使用git下载代码需要一个服务器一个服务器的去下载 把所有需要用的服务都下载下来
+        # git clone ssh://git@git.norn7.com:WeiGame/c-redis-sentinel.git
+        # echo "下载完成"
+        # 使用scp 命令可以将所有要用到的代码放在一个目录中直接下载
+        # sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data /
+        # sudo mv /data/18 /opt
+        sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/home/wcb_tech01/get-docker.sh /
+        sudo mv /get-docker.sh /home/yangyp
+    ;;
+    2)
+        echo "配置环境"
+        #根据当前系统(Ubuntu、CentOS)安装docker
+        result=`sudo find /etc/ -name redhat-release`
+        # echo $result
+        if [ -z "$result" ]; then
+            echo "当前系统是Ubuntu"
+            # 安装docker
+            # 1 卸载旧版本
+            sudo apt-get remove docker \
+                         docker-engine \
+                         docker.io
+            # 2 鉴于国内网络问题 这里换成阿里源
+            sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+            sudo cp /data/workspace/redis-sentinel/sources.list /etc/apt/sources.list
+
+            sudo apt-get update     # 更新源
+            sudo apt-get upgrade    # 更新软件
+
+            curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
+            # sudo add-apt-repository \
+            #     "deb [arch=amd64] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu \"
+            #     $(lsb_release -cs) \
+            #     "stable"
+
+            # 3 安装 Docker CE
+            sudo apt-get install docker-ce
+            curl -fsSL get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh --mirror Aliyun
+
+            # 4 启动 Docker CE
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            # 5 建立 docker 用户组
+            udo groupadd docker
+            sudo usermod -aG docker $USER
+            # 安装完成
+
+            # 配置ubuntu服务
+            /data/workspace/ubuntu-dev/./build
+            # 配置redis服务
+            /data/workspace/redis-sentinel/./build
+            # 配置name服务
+            /data/workspace/name-service/./build
+            # 获取旧的IP
+            temp=`cat /data/workspace/name-service/supervisor-app.conf`
+            oldIp=${temp##*=}
+            oldIp=${oldIp%% *}
+            # 修改IP
+            sed -i "s/$oldIp/$1/g" /data/workspace/name-service/supervisor-app.conf
+
+        else
+            echo "当前系统是CentOS"
+            # 安装docker
+        fi
+    ;;
+    3)
+        echo "启动服务"
+        v=`cat /home/yangyp/test.txt`
+        # echo $v
+        # 获取旧的IP
+        # oldIp=${v##*=}
+        oldIp=${${v##*=}%% *}
+        # echo $oldIp
+        # 修改IP
+        sed -i "s/$oldIp/$1/g" /home/yangyp/test.txt
+        
+    ;;
+    *)
+        echo "\033[33m输入有误 请检查！\033[0m"
+    ;;
+esac
+
