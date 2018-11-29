@@ -1,173 +1,255 @@
-#! /bin/sh
+#! /bin/bash
 
-clear
-echo "\033[5;0H"
-echo "\033[32m******************************************************************\033[0m"
-echo "\033[32m**********  *    *  *****  *    *  *****       *******************\033[0m"
-echo "\033[32m***********  *  *  *******  *  *  ******  (*)   ******************\033[0m"
-echo "\033[32m************  **  *********  **  *******       *******************\033[0m"
-echo "\033[32m**************  *************  *********  ************************\033[0m"
-echo "\033[32m**************  *************  *********  ************************\033[0m"
-echo "\033[32m**************  *************  *********  ************************\033[0m"
-echo "\033[32m******************************************************************\033[0m"
+# 获取平台类型，mac还是linux平台
+function get_platform_type()
+{
+    echo $(uname)
+}
 
-echo "\033[15;0H\033[32m------------------------------------------------------------------"
-echo "\033[16;3H1.---->下载代码"
-echo "\033[17;3H2.---->配置环境"
-echo "\033[18;3H3.---->启动服务"
-echo "------------------------------------------------------------------\033[0m"
+function print_logo()
+{
+    clear
+    color="$(tput setaf 6)"
+    normal="$(tput sgr0)"
+    printf "${color}"
+    echo '******************************************************************'
+    echo '**********  *    *  *****  *    *  *****       *******************'
+    echo '***********  *  *  *******  *  *  ******  (*)   ******************'
+    echo '************  **  *********  **  *******       *******************'
+    echo '**************  *************  *********  ************************'
+    echo '**************  *************  *********  ************************'
+    echo '**************  *************  *********  ************************'
+    echo '******************************************************************'
+    echo ''
+    echo ''
+    echo '------------------------------------------------------------------'
+    echo '1.---->下载代码'
+    echo '2.---->安装docker'
+    echo '3.---->配置服务'
+    echo '4.---->启动服务'
+    echo '------------------------------------------------------------------'
+    printf "${normal}"
+}
 
-echo "\033[21;0H"
+function download_code()
+{
+    # 使用git下载代码需要一个服务器一个服务器的去下载 把所有需要用的服务都下载下来
+    # git clone ssh://git@git.norn7.com:WeiGame/c-redis-sentinel.git
+    # 使用scp 命令可以将所有要用到的代码放在一个目录中直接下载
+    sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data/workspace /data/
+    sudo mv /data/workspace/18 /opt
+    echo "下载完成!"
+}
 
-read -p "please input select number : " num
+function install_docker_on_ubuntu()
+{
+    # 安装docker
+    # 1 卸载旧版本
+    sudo apt-get remove docker \
+		 docker-engine \
+		 docker.io
 
-case $num in
-    1)
-        echo "下载代码..."
-        # 使用git下载代码需要一个服务器一个服务器的去下载 把所有需要用的服务都下载下来
-        # git clone ssh://git@git.norn7.com:WeiGame/c-redis-sentinel.git
-        # 使用scp 命令可以将所有要用到的代码放在一个目录中直接下载
-        sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data /
-        sudo mv /data/18 /opt
-        echo "下载完成!"
-    ;;
-    2)
-        echo "配置环境"
-        read -p "please input local ip : " localIp
-        #根据当前系统(Ubuntu、CentOS)安装docker
-        result=`sudo find /etc/ -name redhat-release`
-        # echo $result
-        if [ -z "$result" ]; then
-            echo "当前系统是Ubuntu"
-            # 安装docker
-            # 1 卸载旧版本
-            sudo apt-get remove docker \
-                         docker-engine \
-                         docker.io
+    # 2 鉴于国内网络问题 这里换成阿里源
+    sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    sudo cp /data/workspace/debug/redis-sentinel/sources.list /etc/apt/sources.list
 
-            # 2 鉴于国内网络问题 这里换成阿里源
-            sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
-            sudo cp /data/workspace/redis-sentinel/sources.list /etc/apt/sources.list
+    sudo apt-get update     # 更新源
+    sudo apt-get upgrade    # 更新软件
 
-            sudo apt-get update     # 更新源
-            sudo apt-get upgrade    # 更新软件
+    curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
+    # sudo add-apt-repository \
+    #     "deb [arch=amd64] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu \"
+    #     $(lsb_release -cs) \
+    #     "stable"
 
-            curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
-            # sudo add-apt-repository \
-            #     "deb [arch=amd64] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu \"
-            #     $(lsb_release -cs) \
-            #     "stable"
+    # 3 安装 Docker CE
+    sudo apt-get install docker-ce
+    curl -fsSL get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh --mirror Aliyun
 
-            # 3 安装 Docker CE
-            sudo apt-get install docker-ce
-            curl -fsSL get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh --mirror Aliyun
+    # 4 启动 Docker CE
+    sudo systemctl enable docker
+    sudo systemctl start docker
 
-            # 4 启动 Docker CE
-            sudo systemctl enable docker
-            sudo systemctl start docker
+    # 5 建立 docker 用户组
+    udo groupadd docker
+    sudo usermod -aG docker $USER
+    # 安装完成
+    echo "docker 安装完成！"
+}
 
-            # 5 建立 docker 用户组
-            udo groupadd docker
-            sudo usermod -aG docker $USER
-            # 安装完成
+function install_docker_on_centos()
+{
+    # 安装docker
+    # 1 卸载旧版本
+    sudo yum remove docker \
+		    docker-client \
+		    docker-client-latest \
+		    docker-common \
+		    docker-latest \
+		    docker-latest-logrotate \
+		    docker-logrotate \
+		    docker-selinux \
+		    docker-engine-selinux \
+		    docker-engine
+
+    # 2 安装依赖包
+    sudo yum install -y yum-utils \
+	     device-mapper-persistent-data \
+	     lvm2
+
+    # 3 使用国内源
+    udo yum-config-manager \
+	--add-repo \
+	https://mirrors.ustc.edu.cn/docker-ce/linux/centos/docker-ce.repo
+
+    # 4 安装 Docker CE
+    sudo yum makecache fast
+    sudo yum install docker-ce
+    curl -fsSL get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh --mirror Aliyun
+
+    # 5 启动 Docker CE
+    sudo systemctl enable docker
+    sudo systemctl start docker
+
+    # 6 建立 docker 用户组
+    sudo groupadd docker
+    # sudo usermod -aG docker $USER
+    sudo gpasswd -a $USER docker
+    newgrp docker
+    # 安装完成
+    echo "docker 安装完成！"
+}
+
+function config_service()
+{
+    echo "配置服务"
+    # 配置ubuntu服务
+    cd /data/workspace/debug/ubuntu-dev/
+    ./build
+    # 配置redis服务
+    cd /data/workspace/debug/redis-sentinel/
+    ./build
+    # 配置name服务
+    cd /data/workspace/debug/name-service/
+    ./build
+}
+
+function modify_ip()
+{
+    echo "更改IP"
+    read -p "please input local ip : " localIp
+    # 获取旧的IP
+    temp=`cat /data/workspace/debug/name-service/supervisor-app.conf`
+    oldIp=${temp##*=}
+    oldIp=${oldIp%% *}
+    # 修改IP
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/name-service/supervisor-app.conf
+
+    # 改其他服的IP
+    # Node-Manager
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/Node-Manager/lib/mw-node
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/Node-Manager/lib/mw-node.json
+    # api-server
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/api-server/lib/mw-api
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/api-server/lib/mw-api.json
+    # game-server
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/game-server/lib/mw-game
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/game-server/lib/mw-game.json
+    # pk-server
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/pk-server/lib/mw-pk
+    sed -i "s/$oldIp/$localIp/g" /data/workspace/debug/pk-server/lib/mw-pk.json
+}
+
+function start_service()
+{
+    echo "启动服务"
+    # 启动redis服务
+    cd /data/workspace/debug/redis-sentinel/
+    ./start-yyp
+    echo "redis启动完成！"
+
+    # 启动name服务
+    cd /data/workspace/debug/name-service/
+    ./start
+    echo "name启动完成！"
+
+    echo "请手动编译并开启以下服务："
+    sleep 1
+    echo "1. 启动Node服"
+    sleep 1
+    echo "2. 启动api服"
+    sleep 1
+    echo "3. 启动pk服"
+    sleep 1
+    echo "4. 启动game服"
+    sleep 1
+    echo "^_^"
+}
+
+function select_exec()
+{
+    read -p "please input select number : " num
+
+    case $num in
+        1)
+            echo "下载代码..."
+            download_code
+        ;;
+        2)
+            echo "配置环境"
+            #根据当前系统(Ubuntu、CentOS)安装docker
+            if which apt-get > /dev/null ; then
+                echo "当前系统是Ubuntu"
+                install_docker_on_ubuntu
+	    elif which yum > /dev/null ; then
+                echo "当前系统是CentOS"
+                install_docker_on_centos
+            fi
+        ;;
+        3)
+            # 配置服务
+            config_service
+            # 更改IP
+            modify_ip
+        ;;
+        4)
+	    # 启动服务
+            start_service
+        ;;
+        *)
+            echo "输入有误 请检查！"
+        ;;
+    esac
+}
+
+# 在linux平台安装docker
+function install_docker_on_linux()
+{
+    echo "当前系统操作平台是Linux"
+}
+
+# main函数
+function main()
+{
+    while true
+    do
+        print_logo
+
+        type=`get_platform_type`
+        echo "platform type: "${type}
+
+        if [ ${type} == "Linux" ]; then
+            install_docker_on_linux
         else
-            echo "当前系统是CentOS"
-            # 安装docker
-            # 1 卸载旧版本
-            sudo yum remove docker \
-                            docker-client \
-                            docker-client-latest \
-                            docker-common \
-                            docker-latest \
-                            docker-latest-logrotate \
-                            docker-logrotate \
-                            docker-selinux \
-                            docker-engine-selinux \
-                            docker-engine
-
-            # 2 安装依赖包
-            sudo yum install -y yum-utils \
-                     device-mapper-persistent-data \
-                     lvm2
-
-            # 3 使用国内源
-            udo yum-config-manager \
-                --add-repo \
-                https://mirrors.ustc.edu.cn/docker-ce/linux/centos/docker-ce.repo
-
-            # 4 安装 Docker CE
-            sudo yum makecache fast
-            sudo yum install docker-ce
-            curl -fsSL get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh --mirror Aliyun
-
-            # 5 启动 Docker CE
-            sudo systemctl enable docker
-            sudo systemctl start docker
-
-            # 6 建立 docker 用户组
-            sudo groupadd docker
-            sudo usermod -aG docker $USER
-            # 安装完成
+            echo "not support platform type: "${type}
         fi
-        # 配置ubuntu服务
-        cd /data/workspace/ubuntu-dev/
-        ./build
-        # 配置redis服务
-        cd /data/workspace/redis-sentinel/
-        ./build
-        # 配置name服务
-        cd /data/workspace/name-service/
-        ./build
-        # 获取旧的IP
-        temp=`cat /data/workspace/name-service/supervisor-app.conf`
-        oldIp=${temp##*=}
-        oldIp=${oldIp%% *}
-        # 修改IP
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/name-service/supervisor-app.conf
 
-        # 改其他服的IP
-        # Node-Manager
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/Node-Manager/lib/mw-node
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/Node-Manager/lib/nm-mw.json
-        # api-server
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/api-server/lib/my-api
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/api-server/lib/my-api.json
-        # game-server
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/game-server/lib/mw-game
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/game-server/lib/mw-game.json
-        # pk-server
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/pk-server/lib/mw-pk
-        sed -i "s/$oldIp/$localIp/g" /data/workspace/pk-server/lib/mw_pk.json
-    ;;
-    3)
-        echo "启动服务"
-        # 启动name服务
-        # cd /data/workspace/name-service/
-        # ./start
+        select_exec
+        sleep 2
+    done
+}
 
-        echo "请手动开启服务："
-        sleep 1
-        echo "1. 启动redis服"
-        sleep 1
-        echo "2. 启动Node服"
-        sleep 1
-        echo "3. 启动api服"
-        sleep 1
-        echo "4. 启动pk服"
-        sleep 1
-        echo "5. 启动game服"
-        sleep 1
-        echo "^_^"
-
-        # 启动redis服务
-        # cd /data/workspace/redis-sentinel/
-        # ./start
-        
-    ;;
-    *)
-        echo "\033[33m输入有误 请检查！\033[0m"
-    ;;
-esac
-
+# 调用main函数
+main
