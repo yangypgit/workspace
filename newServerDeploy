@@ -33,11 +33,6 @@ function print_logo()
 
 function download_code()
 {
-    # 使用git下载代码需要一个服务器一个服务器的去下载 把所有需要用的服务都下载下来
-    # git clone ssh://git@git.norn7.com:WeiGame/c-redis-sentinel.git
-    # 使用scp 命令可以将所有要用到的代码放在一个目录中直接下载
-    sudo scp -P 5136 -r wcb_tech01@123.59.37.103:/data/workspace /data/
-    sudo mv /data/workspace/18 /opt
     echo "下载完成!"
 }
 
@@ -72,7 +67,7 @@ function install_docker_on_ubuntu()
     sudo systemctl start docker
 
     # 5 建立 docker 用户组
-    udo groupadd docker
+    sudo groupadd docker
     sudo usermod -aG docker $USER
     # 安装完成
     echo "docker 安装完成！"
